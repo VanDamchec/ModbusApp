@@ -3,14 +3,14 @@ from openpyxl import Workbook
 import sys
 import os
 
-def generate_sampling_table(input_file):
+def generate_sampling_table(input_path="signals.xlsx", output_path="sample_for_panel"):
     # Проверяем, существует ли входной файл
-    if not os.path.exists(input_file):
-        print(f"Файл {input_file} не найден.")
+    if not os.path.exists(input_path):
+        print(f"Файл {input_path} не найден.")
         return
 
     # Открываем входной файл
-    wb_input = openpyxl.load_workbook(input_file)
+    wb_input = openpyxl.load_workbook(input_path)
     if 'AI' not in wb_input.sheetnames:
         print("Лист 'AI' не найден в файле.")
         return
@@ -62,10 +62,9 @@ def generate_sampling_table(input_file):
     ws_output.append([" "," ","10000 Records limited: Off",])
 
     # Сохраняем результат
-    output_file = os.path.splitext(input_file)[0] + "_out.xlsx"
-    wb_output.save(output_file)
+    wb_output.save(output_path)
+    return True
 
-    print(f"Файл успешно сохранён: {output_file}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

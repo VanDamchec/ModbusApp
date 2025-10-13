@@ -11,7 +11,8 @@ from tkinter import filedialog
 
 from text_table_generate import create_name_table
 from modbus_map_for_panel import convert_modbus_map
-
+from data_sample_table import  generate_sampling_table
+from text_in_macros import generate_all_case_files
 
 def pdf_to_xlsx(path_pdf, path_xlsx, start_page, end_page):
     di_map = namedtuple("di_map", "poz name module_name module_poz channel contact type_signal".split())
@@ -203,8 +204,6 @@ def create_modbus_map(sample_map_path, out_map_path, name_sheet,
                                 if not is_merged:
                                     new_cell.value = old_cell.value
                                     new_cell._style = copy(old_cell._style)
-                                    if old_cell.hyperlink:
-                                        new_cell.hyperlink = old_cell.hyperlink
 
                             for i in range(1, 9):
                                 old_cell = ws_sample.cell(row=j, column=i)
@@ -216,8 +215,6 @@ def create_modbus_map(sample_map_path, out_map_path, name_sheet,
                                 if not is_merged:
                                     new_cell.value = old_cell.value
                                     new_cell._style = copy(old_cell._style)
-                                    if old_cell.hyperlink:
-                                        new_cell.hyperlink = old_cell.hyperlink
 
                         for i in range(1, 9):
                             new_cell = ws_sample.cell(row=j, column=i)
@@ -302,11 +299,12 @@ global error_str
 error_str = ""
 global sample_sheetnames
 sample_sheetnames = []
-global generate_address_labels, generate_name_table, generate_journal
+global generate_address_labels, generate_name_table, generate_journal, generate_sample, generate_macros_text
 generate_address_labels = False
 generate_name_table = False
-generate_journal = False  # пока не используется, но для будущего
-
+generate_journal = False
+generate_sample = False
+generate_macros_text = False
 
 def handle_overwrite_response(filename, on_confirm, on_cancel):
     """Показывает диалог перезаписи и вызывает колбэк после выбора."""
@@ -416,41 +414,52 @@ def create_table(sender, appdata):
         if not paths[2]:
             raise ValueError("Не указан путь для сохранения")
 
-        # Сначала показываем диалог выбора файлов
-        modbus_map_path = select_file_system_dialog(
-            filetypes=[("Excel файлы", "*.xlsx")],
-            initial_dir=paths[2],
-            title="Выберите файл modbus_map.xlsx"
-        )
-        if not modbus_map_path:
-            return  # пользователь отменил
+        if generate_address_labels :
+            # Сначала показываем диалог выбора файлов
+            modbus_map_path = select_file_system_dialog(
+                filetypes=[("Excel файлы", "*.xlsx")],
+                initial_dir=paths[2],
+                title="Выберите ваш файл сформированной Карты регистров (modbus_map.xlsx)."
+            )
+            if not modbus_map_path:
+                return  # пользователь отменил
 
-        signals_path = select_file_system_dialog(
-            filetypes=[("Excel файлы", "*.xlsx")],
-            initial_dir=paths[2],
-            title="Выберите файл signals.xlsx"
-        )
-        if not signals_path:
-            return  # пользователь отменил
+            if not os.path.exists(modbus_map_path):
+                raise FileNotFoundError("Файл modbus_map.xlsx не найден.")
 
-        if not os.path.exists(signals_path):
-            raise FileNotFoundError("Файл signals.xlsx не найден.")
-        if not os.path.exists(modbus_map_path):
-            raise FileNotFoundError("Файл modbus_map.xlsx не найден.")
+            # Загружаем список листов из modbus_map.xlsx
+            wb = openpyxl.load_workbook(modbus_map_path, read_only=True)
+            sheetnames = wb.sheetnames
+            wb.close()
 
-        # Загружаем список листов из modbus_map.xlsx
-        wb = openpyxl.load_workbook(modbus_map_path, read_only=True)
-        sheetnames = wb.sheetnames
-        wb.close()
+        if (generate_sample
+              or generate_journal
+              or generate_name_table
+              or generate_macros_text):
+            # Сначала показываем диалог выбора файлов
+            signals_path = select_file_system_dialog(
+                filetypes=[("Excel файлы", "*.xlsx")],
+                initial_dir=paths[2],
+                title="Выберите ваш файл с таблицей сигналов (signals.xlsx)"
+            )
+            if not signals_path:
+                return  # пользователь отменил
 
-        def start_generation(selected_sheet_name):
+            if not os.path.exists(signals_path):
+                raise FileNotFoundError("Файл c signals.xlsx не найден.")
+        else:
+            raise ValueError("Не выбраны файлы для генерации.")
+
+        def start_generation(selected_sheet_name="Шаблон"):
             # Теперь можно запускать генерацию
             sample_name = selected_sheet_name  # используем выбранный лист
 
             # --- Логика генерации ---
             messages = []
 
-            if not (generate_address_labels or generate_name_table or generate_journal):
+            if not (generate_address_labels or generate_name_table
+                    or generate_journal or generate_sample
+                    or generate_macros_text):
                 raise ValueError("Не выбраны таблицы для генерации")
 
             # 1. Таблица строк
@@ -486,10 +495,50 @@ def create_table(sender, appdata):
             if generate_journal:
                 messages.append("Журнал: не реализован")
 
+            if generate_sample:
+                try:
+                    success = generate_sampling_table(
+                        input_path=signals_path,
+                        output_path=os.path.join(paths[2], "sample_for_panel.xlsx")
+                    )
+                    if success:
+                        messages.append("Таблица выборки создана")
+                    else:
+                        messages.append("Функция generate_sampling_table вернула False")
+                except PermissionError:
+                    messages.append(
+                        "Файл sample_for_panel.xlsx уже открыт в Excel. Закройте его и повторите попытку."
+                    )
+                except Exception as e:
+                    # Выводим более подробную ошибку
+                    messages.append(f"Ошибка при создании таблицы выборки: {str(e)}")
+
+            if generate_macros_text:
+                try:
+                    success = generate_all_case_files(
+                        input_excel=signals_path,
+                        output_dir=os.path.join(paths[2], "macros_text"),
+                        max_len=40
+                    )
+                    if success:
+                        messages.append("Файлы для макросв созданы")
+                    else:
+                        messages.append("Функция generate_all_case_files вернула False")
+                except PermissionError:
+                    messages.append(
+                        "Файл sample_for_panel.xlsx уже открыт в Excel. Закройте его и повторите попытку."
+                    )
+                except Exception as e:
+                    # Выводим более подробную ошибку
+                    messages.append(f"Ошибка при создании таблицы выборки: {str(e)}")
+
             dpg.set_value("error_text", "; ".join(messages) if messages else "Ничего не сгенерировано")
 
-        # Показываем диалог выбора листа
-        show_sheet_selection_dialog_for_generation(sheetnames, start_generation)
+        # Показываем диалог выбора листа если гененерируем вдрессные метки
+        if generate_address_labels:
+            show_sheet_selection_dialog_for_generation(sheetnames, start_generation)
+        else:
+            start_generation()
 
     except Exception as ex:
         dpg.set_value("error_text", f"Ошибка: {str(ex)}")
@@ -508,7 +557,8 @@ def show_sheet_selection_dialog(sheetnames):
         selected = dpg.get_value("sheet_selector_combo")
         if selected:
             sample_name = selected
-            dpg.configure_item("sample_combo", items=sheetnames)
+            dpg.configure_item("sample_combo"
+                               , items=sheetnames)
             dpg.set_value("sample_combo", selected)
             dpg.set_value("error_text", f"Выбран лист: {selected}")
         dpg.delete_item("sheet_selection_modal")
@@ -688,6 +738,22 @@ def on_journal_checkbox(sender, app_data):
     global generate_journal
     generate_journal = app_data
 
+def on_sample_table(sender, app_data):
+    if not paths[2]:
+        dpg.set_value(sender, False)
+        dpg.set_value("error_text", "Сначала укажите путь для сохранения")
+        return
+    global generate_sample
+    generate_sample = app_data
+
+def on_macros_text(sender, app_data):
+    if not paths[2]:
+        dpg.set_value(sender, False)
+        dpg.set_value("error_text", "Сначала укажите путь для сохранения")
+        return
+    global generate_macros_text
+    generate_macros_text = app_data
+
 def show_sheet_selection_dialog_for_generation(sheetnames, on_confirm):
     """Показывает диалог выбора листа и вызывает on_confirm с выбранным именем."""
     selected_sheet = [None]
@@ -794,12 +860,15 @@ def gui():
                 dpg.add_input_text(hint="Путь к папке с проектом", tag="input_text_2", width=690)
 
         with dpg.collapsing_header(label="4. Данные для визуализации", leaf=True):
-            dpg.add_text("Выберите необходимые таблицы для визуализации Weintek EasyBuilderPro")
+            dpg.add_text("Выберите необходимые файлы для визуализации Weintek EasyBuilderPro")
             with dpg.group(horizontal=True):
                 dpg.add_checkbox(label="Адресные метки", callback=on_address_labels_checkbox, tag="cb_address")
                 dpg.add_checkbox(label="Таблица строк", callback=on_name_table_checkbox, tag="cb_name_table")
                 dpg.add_checkbox(label="Журнал", callback=on_journal_checkbox, tag="cb_journal")
-                dpg.add_button(label="Сформировать таблицы", callback=create_table, tag="btn_generate_tables")
+                dpg.add_checkbox(label="Таблица выборки", callback=on_sample_table, tag="cb_sample_table")
+                dpg.add_checkbox(label="Файлы макросв", callback=on_macros_text, tag="cb_macros_text")
+            with dpg.group(horizontal=True):
+                dpg.add_button(label="Сформировать файлы", callback=create_table, tag="btn_generate_tables")
                 dpg.configure_item("btn_generate_tables", enabled=bool(paths[2]))
 
         with dpg.group(horizontal=True):

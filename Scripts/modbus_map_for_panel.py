@@ -35,7 +35,8 @@ def convert_modbus_map(path_map="",name_new_map="modbus_for_panel", name_sheet =
         print(data_type)
         mapping = {
             "FLOAT(4 byte)": "32-bit Float",
-            "INT(2 byte)": "16-bit Unsigned",
+            "WORD(2 byte)": "16-bit Unsigned",
+            "UDINT(4 byte)": "32-bit Unsigned",
             # Можно добавить другие типы при необходимости
         }
         return mapping.get(data_type.strip(), "Неопределенный")
