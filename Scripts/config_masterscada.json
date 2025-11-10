@@ -1,0 +1,85 @@
+{
+  "source": {
+    "sheet": "Шаблон",
+    "header_row": 1,
+    "headers": [
+      "Наименование параметра",
+      "Адрес регистра",
+      "Доступные Функции",
+      "Тип данных",
+      "Доступ",
+      ""
+    ]
+  },
+  "target": {
+    "sheet": "Modbus Tag",
+    "header_row": 1,
+    "headers": [
+      "Name",
+      "Region",
+      "Address",
+      "DataTypeDevice",
+      "DataTypeScada",
+      "Access",
+      "TypeString",
+      "LengthString",
+      "Scale",
+      "Comment"
+    ]
+  },
+  "row_filter": {
+    "require_all": ["Адрес регистра"]},
+
+  "mappings": [
+    {
+      "to": "Name",
+      "template": "{python re.sub(r'[^A-Za-z]', '', (J or ''))}.{J}.{python (K or '').split(':')[0] if 'BITMAP' in (L or '') else K}"
+    },
+    {
+      "to": "Region",
+      "value": "HOLDING_REGISTERS"
+    },
+    {
+      "to": "Address",
+      "from": "Адрес регистра",
+      "skip_if_blank": true
+    },
+    {
+      "to": "DataTypeDevice",
+      "from": "Тип данных",
+      "map": {
+        "float(4 byte)": "REAL",
+        "word(2 byte)": "WORD",
+        "bool": "BOOL",
+        "duint(4 byte)": "DWORD"},
+      "default" : "WORD"
+    },
+    {
+      "to": "DataTypeScada",
+      "from": "Тип данных",
+      "map": {
+        "float(4 byte)": "REAL",
+        "word(2 byte)": "WORD",
+        "bool": "BOOL",
+        "duint(4 byte)": "DWORD"},
+      "default" : "WORD"
+    },
+    {
+      "to": "Access",
+      "from": "Доступ",
+      "map": {
+        "r": "ReadOnly",
+        "w":  "WriteOnly",
+        "r/w": "ReadWrite"},
+      "default" : "ReadWrite"
+    },
+    {
+      "to": "Scale",
+      "value": "0;0;0;0"
+    },
+    {
+      "to": "Comment",
+      "from": "K"
+    }
+  ]
+}

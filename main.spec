@@ -1,11 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+added_files = [
+    ("Scripts/config_masterscada.json", ".")
+]
 
 a = Analysis(
     ['Scripts\main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=added_files,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

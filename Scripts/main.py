@@ -9,6 +9,7 @@ from copy import copy
 import dearpygui.dearpygui as dpg
 import os
 import tkinter as tk
+import json
 from tkinter import filedialog
 
 from text_table_generate import create_name_table
@@ -16,6 +17,7 @@ from modbus_map_for_panel import convert_modbus_map
 from data_sample_table import  generate_sampling_table
 from text_in_macros import generate_all_case_files
 from journal_map import generate_alarms_from_modbus_map
+from excel_transformer import transform_excel
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pydevd_plugins")
@@ -354,6 +356,7 @@ generate_name_table = False
 generate_journal = False
 generate_sample = False
 generate_macros_text = False
+generate_masterscada = False
 
 dpg.create_context()
 
@@ -657,6 +660,62 @@ def create_table(sender, appdata):
     except Exception as ex:
         set_colored_message([(f"Ошибка: {str(ex)}", error_theme)])
 
+def create_scada(sender, appdata):
+    try:
+        messages = []
+        if not paths[2]:
+            raise ValueError("Не указан путь для сохранения")
+
+        # Запрашиваем у пользователя файл
+        modbus_map_path = select_file_system_dialog(
+            filetypes=[("Excel файлы", "*.xlsx")],
+            initial_dir=paths[2],
+            title="Выберите файл карты регистров  (modbus_map.xlsx)."
+        )
+
+        if not os.path.exists(modbus_map_path):
+            raise FileNotFoundError("Файл modbus_map.xlsx не найден. Сначала сформируйте карту регистров.")
+
+        if generate_masterscada:
+            with open("config_masterscada.json", 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+        else:
+            messages.append("не выбраны таблицы для генерации")
+
+        try:
+            dpg.configure_item("load_indic_scada_tables", show=True)
+            succsess = transform_excel(input_path=modbus_map_path,
+                            output_path=os.path.join(paths[2], "modbus_map_scada.xlsx"),
+                            config= cfg)
+
+            if succsess:
+                messages.append("Файлы для SCADA созданы")
+            else:
+                messages.append("Функция transform_excel вернула False")
+            dpg.configure_item("load_indic_scada_tables", show=False)
+
+        except PermissionError:
+            messages.append(
+                "Файл modbus_map_scada или папка заняты. Закройте Excel или проводник и повторите попытку."
+            )
+        except Exception as e:
+            messages.append(f"Ошибка при создании файлов: {str(e)}")
+
+        if messages:
+            colored_messages = []
+            for msg in messages:
+                if "создан" in msg.lower() or "созданы" in msg.lower():  # Проверяем на успешные слова
+                    colored_messages.append((msg + "; ", success_theme))
+                else:  # Остальные (ошибки, предупреждения, "Функция вернула False")
+                    colored_messages.append((msg + "; ", error_theme))
+            set_colored_message(colored_messages)
+        else:
+            # Для сообщения "Ничего не сгенерировано" можно выбрать цвет, например, красный как предупреждение
+            set_colored_message([("Ничего не сгенерировано", error_theme)])
+
+    except Exception as ex:
+        set_colored_message([(f"Ошибка: {str(ex)}", error_theme)])
+
 def set_numbers(sender, app_data):
     data_numbers[sender] = app_data
 
@@ -756,6 +815,7 @@ def path_extractor(sender, app_data, id):
 
         if id == 2:  # путь сохранения
             dpg.configure_item("btn_generate_tables", enabled=bool(paths[2]))
+            dpg.configure_item("btn_generate_scada", enabled=bool(paths[2]))
 
     except Exception as ex:
         set_colored_message([(str(ex), error_theme)])
@@ -824,6 +884,7 @@ def select_file(name, id, only_directory=False):
         # === Обновляем кнопку генерации таблиц ===
         if id == 2:  # путь сохранения
             dpg.configure_item("btn_generate_tables", enabled=bool(paths[2]))
+            dpg.configure_item("btn_generate_scada", enabled=bool(paths[2]))
 
     except Exception as ex:
         set_colored_message([(str(ex), error_theme)])
@@ -876,6 +937,14 @@ def on_macros_text(sender, app_data):
         return
     global generate_macros_text
     generate_macros_text = app_data
+
+def on_masterscada(sender, app_data):
+    if not paths[2]:
+        dpg.set_value(sender, False)
+        set_colored_message([("Сначала укажите путь для сохранения", error_theme)])
+        return
+    global generate_masterscada
+    generate_masterscada = app_data
 
 def show_sheet_selection_dialog_for_generation(sheetnames, on_confirm):
     """Показывает диалог выбора листа и вызывает on_confirm с выбранным именем."""
@@ -1016,6 +1085,19 @@ def gui():
             with dpg.group(horizontal=True):
                 dpg.add_button(label="Сформировать файлы", callback=create_table, tag="btn_generate_tables")
                 dpg.configure_item("btn_generate_tables", enabled=bool(paths[2]))
+                dpg.add_loading_indicator(style=1, radius=1.3, color=(0, 0, 255), show=False,
+                                          tag="load_indic_panel_tables")
+
+        with dpg.collapsing_header(label="5. Данные для SCADA", leaf=True):
+            dpg.add_text("Выберите необходимые файлы для генерации")
+            with dpg.group(horizontal=True):
+                dpg.add_checkbox(label="Modbus MasterScada", callback=on_masterscada, tag="cb_masterscada")
+
+            with dpg.group(horizontal=True):
+                dpg.add_button(label="Сформировать файлы", callback=create_scada, tag="btn_generate_scada")
+                dpg.configure_item("btn_generate_scada", enabled=bool(paths[2]))
+                dpg.add_loading_indicator(style=1, radius=1.3, color=(0, 0, 255), show=False,
+                                          tag="load_indic_scada_tables")
 
         with dpg.group(horizontal=True):
             dpg.add_button(label="Сформировать список сигналов", callback=create_xlsx, pos=(8, window_height - 160),

@@ -34,10 +34,10 @@ def generate_sampling_table(input_path="signals.xlsx", output_path="sample_for_p
     ws_output.append(["Data Sampling", "AI_PV"])
     ws_output.append([" ","Sample Mode","Time-based","1000 ms"])
     ws_output.append([" "," ", "High Priority: Off"])
-    ws_output.append([" ","Read Address","ABAK PLC","4x","System Tag: Off","User-defined Tag: Off","1","IDX: null"])
+    ws_output.append([" ","Read Address","PLC","4x","System Tag: Off","User-defined Tag: Off","1","IDX: null"])
     ws_output.append([" ","Data Record"])
     ws_output.append([" ", " ", signals[1], "32-bit Float","Left of decimal Pt. 4","Right of decimal Pt. 2",
-                      "Leading zero Off","ABAK PLC","4x","System Tag: Off","User-defined Tag: Off","1","IDX: null",])
+                      "Leading zero Off","PLC","4x","System Tag: Off","User-defined Tag: Off","1","IDX: null",])
 
 
     #Добавляем сигналы

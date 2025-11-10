@@ -44,9 +44,9 @@ def convert_modbus_map(path_map="",name_new_map="modbus_for_panel", name_sheet =
         data_type = data_type.strip()
 
         mapping = {
-            "FLOAT(4 byte)": "32-bit Float",
-            "WORD(2 byte)": "16-bit Unsigned",
-            "UDINT(4 byte)": "32-bit Unsigned",
+            "float(4 byte)": "32-bit Float",
+            "word(2 byte)": "16-bit Unsigned",
+            "udint(4 byte)": "32-bit Unsigned",
             "4 byte": "32-bit Unsigned",
             "2 byte": "16-bit Unsigned"
         }
@@ -178,4 +178,4 @@ def convert_modbus_map(path_map="",name_new_map="modbus_for_panel", name_sheet =
 
 
 if __name__ == "__main__" :
-    convert_modbus_map("C:/Users/deminid/PycharmProjects/ModbusApp/Example file/modbus_map_test.xlsx", name_sheet="Шаблон")
+    convert_modbus_map("C:/Users/deminid/PycharmProjects/ModbusApp/Example file/modbus_map.xlsx", name_sheet="Шаблон")
